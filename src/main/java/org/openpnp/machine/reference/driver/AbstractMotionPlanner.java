@@ -714,8 +714,15 @@ public abstract class AbstractMotionPlanner extends AbstractModelObject implemen
         // Note, this loop will be empty if the motion is empty, i.e. if it only contains VirtualAxis movement.
         boolean firstDriver = true;
         for (Driver driver : motionSegment.getAxesDrivers(machine)) {
-            for (Motion.MoveToCommand moveToCommand : plannedMotion
-                    .interpolatedMoveToCommands(driver, isInterpolationRetiming())) {
+            List<Motion.MoveToCommand> moveToCommands = plannedMotion
+                    .interpolatedMoveToCommands(driver, isInterpolationRetiming());
+            // If the interpolator produced multiple segments, tell the firmware to buffer them
+            // before executing. Firmware that does not support M920 will ignore it, and the
+            // segments will execute normally as individual G0 commands.
+            if (moveToCommands.size() > 1 && driver instanceof GcodeDriver) {
+                ((GcodeDriver) driver).sendGcode("M920 S" + moveToCommands.size());
+            }
+            for (Motion.MoveToCommand moveToCommand : moveToCommands) {
                 driver.moveTo(hm, moveToCommand);
                 try {
                     recordDiagnostics(plannedMotion, moveToCommand, driver, firstAfterCoordination, firstDriver);
