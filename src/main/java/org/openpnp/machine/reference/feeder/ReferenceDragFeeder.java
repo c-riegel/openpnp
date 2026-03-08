@@ -77,7 +77,7 @@ public class ReferenceDragFeeder extends ReferenceFeeder {
     @Element
     protected Location feedEndLocation = new Location(LengthUnit.Millimeters);
     @Element(required = false)
-    private Length partPitch = new Length(4, LengthUnit.Millimeters);
+    protected Length partPitch = new Length(4, LengthUnit.Millimeters);
     @Element(required = false)
     protected double feedSpeed = 1.0;
     @Attribute(required = false)
@@ -89,9 +89,9 @@ public class ReferenceDragFeeder extends ReferenceFeeder {
     @Element(required = false)
     protected Length backoffDistance = new Length(0, LengthUnit.Millimeters);    
 
-    private double feededCount = 0;
-    private double partsPitchX = -2; //-2mm for 0402
-    private double partsPitchY = 0;
+    protected double feededCount = 0;
+    protected double partsPitchX = -2; //-2mm for 0402
+    protected double partsPitchY = 0;
 
     /*
      * visionOffset contains the difference between where the part was expected to be and where it
@@ -248,7 +248,7 @@ public class ReferenceDragFeeder extends ReferenceFeeder {
     }
 
     // TODO: Throw an Exception if vision fails.
-    private Location getVisionOffsets(Head head, Location pickLocation) throws Exception {
+    protected Location getVisionOffsets(Head head, Location pickLocation) throws Exception {
         Logger.debug("getVisionOffsets({}, {})", head.getName(), pickLocation);
         // Find the Camera to be used for vision
         Camera camera = null;
