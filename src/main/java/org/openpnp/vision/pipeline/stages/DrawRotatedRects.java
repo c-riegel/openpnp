@@ -47,6 +47,14 @@ public class DrawRotatedRects extends CvStage {
     @Property(description = "Show the orientation of a rotated rect.")
     private boolean showOrientation = false;
 
+    @Attribute(required = false)
+    @Property(description = "Draw a crosshair at the image center for alignment reference.")
+    private boolean drawImageCenterCrosshair = false;
+
+    @Attribute(required = false)
+    @Property(description = "Show center coordinates, size, area, and angle as text overlay.")
+    private boolean showDetails = false;
+
     public Color getColor() {
         return color;
     }
@@ -95,12 +103,43 @@ public class DrawRotatedRects extends CvStage {
         this.showOrientation = showOrientation;
     }
 
+    public boolean isDrawImageCenterCrosshair() {
+        return drawImageCenterCrosshair;
+    }
+
+    public void setDrawImageCenterCrosshair(boolean drawImageCenterCrosshair) {
+        this.drawImageCenterCrosshair = drawImageCenterCrosshair;
+    }
+
+    public boolean isShowDetails() {
+        return showDetails;
+    }
+
+    public void setShowDetails(boolean showDetails) {
+        this.showDetails = showDetails;
+    }
+
     public void drawOrientationMark(Mat image, RotatedRect rrect, Scalar color, int thickness) {
         double markAngle = Math.toRadians(rrect.angle - 90.0);
+        // Line along the orientation angle
         Imgproc.line(image, rrect.center,
                 new Point(rrect.center.x + 1.2 * rrect.size.height / 2.0 * Math.cos(markAngle),
                         rrect.center.y + 1.2 * rrect.size.height / 2.0 * Math.sin(markAngle)),
                 color, Math.abs(thickness), Imgproc.LINE_AA);
+        // Line toward the shorter edge for visual reference
+        Imgproc.line(image, rrect.center,
+                new Point(rrect.center.x,
+                        rrect.center.y - Math.min(rrect.size.height, rrect.size.width)),
+                color, Math.abs(thickness));
+    }
+
+    private void drawCenterCrosshair(Mat image, Scalar color) {
+        int cx = image.width() / 2;
+        int cy = image.height() / 2;
+        Imgproc.line(image, new Point(cx - 15, cy), new Point(cx + 15, cy),
+                color, 2);
+        Imgproc.line(image, new Point(cx, cy - 15), new Point(cx, cy + 15),
+                color, 2);
     }
 
     @Override
@@ -133,6 +172,18 @@ public class DrawRotatedRects extends CvStage {
             if (showOrientation) {
                 drawOrientationMark(mat, rect, FluentCv.colorToScalar(thecolor), thickness);
             }
+            if (showDetails) {
+                Imgproc.putText(mat,
+                        String.format("{%.2f, %.2f} %s=%.0f @ %.2f deg",
+                                rect.center.x, rect.center.y, rect.size,
+                                rect.size.area(), rect.angle),
+                        new Point(10, 25), Imgproc.FONT_HERSHEY_PLAIN, 1,
+                        FluentCv.colorToScalar(thecolor));
+            }
+        }
+        if (drawImageCenterCrosshair && !rects.isEmpty()) {
+            Color thecolor = (color == null ? FluentCv.indexedColor(0) : color);
+            drawCenterCrosshair(mat, FluentCv.colorToScalar(thecolor));
         }
         return new Result(null, rects);
     }
