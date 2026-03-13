@@ -605,7 +605,10 @@ public class GcodeDriver extends AbstractReferenceDriver implements Named {
         command = substituteVariable(command, "Id", hm.getId());
         command = substituteVariable(command, "Name", hm.getName());
         command = substituteVariable(command, "FeedRate", feedRate);
-        command = substituteVariable(command, "Acceleration", acceleration);
+        // When per-segment feed rate is active, suppress M204 — the per-segment F value
+        // fully defines the stepping rate and M204 provides no additional information.
+        command = substituteVariable(command, "Acceleration",
+                getInterpolationPerSegmentFeedRate() ? null : acceleration);
         command = substituteVariable(command, "Jerk", jerk);
 
         ReferenceMachine machine = (ReferenceMachine) hm.getHead().getMachine();

@@ -1103,14 +1103,20 @@ public class Motion {
                             minSegmentAcceleration = Math.min(minSegmentAcceleration, aMinAxis);
                         }
                     }
+                    if (velocity == null && driver.getInterpolationPerSegmentFeedRate()) {
+                        // Per-segment feed rate: use average velocity for constant-rate stepping.
+                        // Controllers that buffer segments and step at a fixed rate per segment
+                        // need the actual segment velocity, not just the global peak.
+                        velocity = Math.max(Math.abs(avgVelocity), minVelocity);
+                    }
 
                     MoveToCommand command2 = new MoveToCommand(
                             location0, location2,
-                            movedAxesLocation, // just the axes that are actually moved  
-                            velocity, 
+                            movedAxesLocation, // just the axes that are actually moved
+                            velocity,
                             Math.max(Math.abs(acceleration), minSegmentAcceleration),
                             null, // No jerk, we're simulating it, remember?
-                            t0, dtNominal, v0, v2); 
+                            t0, dtNominal, v0, v2);
 
                     // Are we making a new segment?
                     boolean newSegment = false;
@@ -1236,8 +1242,11 @@ public class Motion {
         }
         double factor = retiming ? timeEffective/time : 1.0;
         double factorSq = factor*factor;
-        // Set the maximum for the whole move.
-        list.get(0).feedRatePerSecond = maxVelocity;
+        // Set the maximum for the whole move (skip when per-segment feed rate is active,
+        // as each segment already carries its own velocity).
+        if (!driver.getInterpolationPerSegmentFeedRate()) {
+            list.get(0).feedRatePerSecond = maxVelocity;
+        }
         double tSum = 0;
         for (MoveToCommand move : list) {
             if (move.feedRatePerSecond != null) {

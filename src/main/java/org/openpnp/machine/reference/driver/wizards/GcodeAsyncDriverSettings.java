@@ -33,6 +33,7 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
     private JTextField junctionDeviation;
     private JTextField interpolationJerkSteps;
     private JCheckBox reportedLocationConfirmation;
+    private JCheckBox interpolationPerSegmentFeedRate;
 
     public GcodeAsyncDriverSettings(GcodeAsyncDriver driver) {
         this.driver = driver;
@@ -128,6 +129,21 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
         interpolationPanel.add(junctionDeviation, "4, 10, fill, default");
         junctionDeviation.setColumns(10);
 
+        JLabel lblPerSegmentFeedRate = new JLabel("Per-Segment Feed Rate?");
+        lblPerSegmentFeedRate.setToolTipText("<html>"
+                + "Emit the actual average velocity as F on every interpolation segment,<br/>"
+                + "instead of the global peak velocity on the first segment only.<br/><br/>"
+                + "When enabled, M204 acceleration commands are also suppressed, since<br/>"
+                + "the per-segment F value fully defines the stepping rate.<br/><br/>"
+                + "Enable this for controllers that buffer segments (e.g. via M920) and<br/>"
+                + "step at a constant rate per segment, using encoder feedback for<br/>"
+                + "position detection rather than acceleration-based motion control."
+                + "</html>");
+        interpolationPanel.add(lblPerSegmentFeedRate, "2, 12, right, default");
+
+        interpolationPerSegmentFeedRate = new JCheckBox("");
+        interpolationPanel.add(interpolationPerSegmentFeedRate, "4, 12");
+
         JLabel lblConfirmationFlowControl = new JLabel("Confimation Flow Control?");
         lblConfirmationFlowControl.setToolTipText("<html>\r\n<p>The communication with the controller is flow-controlled by awaiting the \"ok\"<br/>\r\nbefore sending the next command. </p>\r\n<p>This is slower than other types of flow control such as RTS/CTS on a serial connection, so <br/>\r\nthe latter should be preferred.</p>\r\n</html>");
         settingsPanel.add(lblConfirmationFlowControl, "2, 2, right, default");
@@ -172,6 +188,7 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
         addWrappedBinding(driver, "interpolationTimeStep", interpolationTimeStep, "text", doubleConverterFine);
         addWrappedBinding(driver, "interpolationMinStep", interpolationMinStep, "text", intConverter);
         addWrappedBinding(driver, "junctionDeviation", junctionDeviation, "text", lengthConverter);
+        addWrappedBinding(driver, "interpolationPerSegmentFeedRate", interpolationPerSegmentFeedRate, "selected");
 
         ComponentDecorators.decorateWithAutoSelect(interpolationMaxSteps);
         ComponentDecorators.decorateWithAutoSelect(interpolationJerkSteps);
