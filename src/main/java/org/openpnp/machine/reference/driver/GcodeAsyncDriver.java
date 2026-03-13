@@ -113,6 +113,9 @@ public class GcodeAsyncDriver extends GcodeDriver {
     @Element(required = false)
     private Length junctionDeviation = new Length(0.02, LengthUnit.Millimeters);
 
+    @Attribute(required = false)
+    private boolean interpolationPerSegmentFeedRate = false;
+
     @Override
     public void home(Machine machine) throws Exception {
         super.home(machine);
@@ -200,6 +203,17 @@ public class GcodeAsyncDriver extends GcodeDriver {
 
     public void setJunctionDeviation(Length junctionDeviation) {
         this.junctionDeviation = junctionDeviation;
+    }
+
+    @Override
+    public boolean getInterpolationPerSegmentFeedRate() {
+        return interpolationPerSegmentFeedRate;
+    }
+
+    public void setInterpolationPerSegmentFeedRate(boolean interpolationPerSegmentFeedRate) {
+        Object oldValue = this.interpolationPerSegmentFeedRate;
+        this.interpolationPerSegmentFeedRate = interpolationPerSegmentFeedRate;
+        firePropertyChange("interpolationPerSegmentFeedRate", oldValue, interpolationPerSegmentFeedRate);
     }
 
     @Override

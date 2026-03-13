@@ -315,7 +315,18 @@ import org.openpnp.spi.MotionPlanner.CompletionType;
     }
 
     /**
-     * @return The minimum velocity, acceleration, jerk the driver supports. 
+     * @return Whether to emit a per-segment feed rate (F parameter) on every interpolation segment.
+     * When true, each segment's F value reflects the average velocity for that time slice of the
+     * S-curve profile, rather than the global peak velocity on the first segment only.
+     * Useful for controllers that step at a constant rate per segment and use encoder feedback
+     * for position detection.
+     */
+    public default boolean getInterpolationPerSegmentFeedRate() {
+        return false;
+    }
+
+    /**
+     * @return The minimum velocity, acceleration, jerk the driver supports.
      * Used to prevent "rounded to zero" errors in decimal formatting and interpolation.
      *  
      * @param order Derivative order, velocity (1), acceleration (2), jerk (3)
