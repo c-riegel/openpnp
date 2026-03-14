@@ -314,31 +314,32 @@ public class GcodeAsyncDriver extends GcodeDriver {
                             lastCommand = null;
                         }
                     }
-                    // Handle CRC16 resend: if firmware responded with 'rs', resend the same command.
-                    if (resendRequested && useCrc16) {
-                        resendRequested = false;
-                        for (int retry = 0; retry < crc16MaxRetries; retry++) {
-                            Logger.warn("[{}] CRC16 resend {}/{}: {}", connectionName, retry + 1, crc16MaxRetries, command);
-                            receivedConfirmationsQueue.clear();
-                            comms.writeLine(command.line);
-                            Logger.trace("[{}] >> {} (resend)", connectionName, command);
-                            waitForConfirmation(command.toString(), command.getTimeout());
-                            if (!resendRequested) {
-                                break;
-                            }
-                            resendRequested = false;
-                        }
-                        if (resendRequested) {
-                            resendRequested = false;
-                            errorResponse = new Line("CRC16 verification failed after " + crc16MaxRetries + " retries");
-                        }
-                    }
                     if (command.line != null) {
-                        // Set up the wanted confirmations for next time.
+                        // Send command, with CRC16 retry if enabled.
                         lastCommand = command;
                         receivedConfirmationsQueue.clear();
                         comms.writeLine(command.line);
                         Logger.trace("[{}] >> {}", connectionName, command);
+                        // CRC16 resend loop: wait for ok/rs, resend on rs.
+                        if (useCrc16) {
+                            for (int attempt = 0; attempt <= crc16MaxRetries; attempt++) {
+                                resendRequested = false;
+                                waitForConfirmation(command.toString(), command.getTimeout());
+                                if (!resendRequested) {
+                                    break;
+                                }
+                                if (attempt < crc16MaxRetries) {
+                                    Logger.warn("[{}] CRC16 resend {}/{}: {}", connectionName, attempt + 1, crc16MaxRetries, command);
+                                    receivedConfirmationsQueue.clear();
+                                    comms.writeLine(command.line);
+                                    Logger.trace("[{}] >> {} (resend)", connectionName, command);
+                                } else {
+                                    errorResponse = new Line("CRC16 verification failed after " + crc16MaxRetries + " retries");
+                                }
+                            }
+                            // CRC16 acts as its own flow control — confirmation already received.
+                            lastCommand = null;
+                        }
                     }
                     else {
                         confirmationComplete = true;

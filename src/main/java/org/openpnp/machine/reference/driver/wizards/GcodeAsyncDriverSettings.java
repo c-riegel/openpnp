@@ -208,13 +208,6 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
         settingsPanel.add(lblUseCrc16, "2, 6, right, default");
 
         useCrc16 = new JCheckBox("");
-        useCrc16.addItemListener(new ItemListener() {
-            public void itemStateChanged(ItemEvent e) {
-                if (useCrc16.isSelected()) {
-                    confirmationFlowControl.setSelected(true);
-                }
-            }
-        });
         settingsPanel.add(useCrc16, "4, 6");
 
         JLabel lblCrc16MaxRetries = new JLabel("CRC16 Max Retries");
