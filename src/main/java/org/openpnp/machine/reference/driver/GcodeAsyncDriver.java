@@ -291,6 +291,8 @@ public class GcodeAsyncDriver extends GcodeDriver {
             String connectionName = comms.getConnectionName();
 
             CommandLine lastCommand = null;
+            CommandLine lastCrcCommand = null;
+            int crcRetryCount = 0;
             while (!disconnectRequested) {
                 CommandLine command;
                 try {
@@ -315,31 +317,11 @@ public class GcodeAsyncDriver extends GcodeDriver {
                         }
                     }
                     if (command.line != null) {
-                        // Send command, with CRC16 retry if enabled.
+                        // Set up the wanted confirmations for next time.
                         lastCommand = command;
                         receivedConfirmationsQueue.clear();
                         comms.writeLine(command.line);
                         Logger.trace("[{}] >> {}", connectionName, command);
-                        // CRC16 resend loop: wait for ok/rs, resend on rs.
-                        if (useCrc16) {
-                            for (int attempt = 0; attempt <= crc16MaxRetries; attempt++) {
-                                resendRequested = false;
-                                waitForConfirmation(command.toString(), command.getTimeout());
-                                if (!resendRequested) {
-                                    break;
-                                }
-                                if (attempt < crc16MaxRetries) {
-                                    Logger.warn("[{}] CRC16 resend {}/{}: {}", connectionName, attempt + 1, crc16MaxRetries, command);
-                                    receivedConfirmationsQueue.clear();
-                                    comms.writeLine(command.line);
-                                    Logger.trace("[{}] >> {} (resend)", connectionName, command);
-                                } else {
-                                    errorResponse = new Line("CRC16 verification failed after " + crc16MaxRetries + " retries");
-                                }
-                            }
-                            // CRC16 acts as its own flow control — confirmation already received.
-                            lastCommand = null;
-                        }
                     }
                     else {
                         confirmationComplete = true;
@@ -368,11 +350,15 @@ public class GcodeAsyncDriver extends GcodeDriver {
     protected void processResponse(Line line) {
         if (useCrc16 && line.getLine().startsWith("rs")) {
             resendRequested = true;
-            // Treat as confirmation so waitForConfirmation unblocks
             receivedConfirmationsQueue.add(line);
+            Logger.trace("[CRC16] rs detected, resend requested");
             return;
         }
         super.processResponse(line);
+        if (useCrc16) {
+            Logger.trace("[CRC16] processResponse: confirmQ size={} for line: {}",
+                    receivedConfirmationsQueue.size(), line.getLine().substring(0, Math.min(40, line.getLine().length())));
+        }
     }
 
     @Override
