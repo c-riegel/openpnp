@@ -315,14 +315,24 @@ import org.openpnp.spi.MotionPlanner.CompletionType;
     }
 
     /**
-     * @return Whether to emit a per-segment feed rate (F parameter) on every interpolation segment.
-     * When true, each segment's F value reflects the average velocity for that time slice of the
-     * S-curve profile, rather than the global peak velocity on the first segment only.
+     * @return Whether to emit a per-step feed rate (F parameter) on every interpolation step.
+     * When true, each step's F value reflects the average velocity for that time slice of the
+     * S-curve profile, rather than the global peak velocity on the first step only.
      * Useful for controllers that step at a constant rate per segment and use encoder feedback
      * for position detection.
      */
     public default boolean getInterpolationPerSegmentFeedRate() {
         return false;
+    }
+
+    /**
+     * @return The maximum allowed velocity change (in mm/s) within a single interpolation step.
+     * When non-null, forces additional step boundaries during constant-acceleration phases
+     * to keep velocity jumps between consecutive steps within stepper motor capabilities.
+     * Only effective when per-step feed rate is enabled.
+     */
+    public default Double getInterpolationMaxStepVelocity() {
+        return null;
     }
 
     /**

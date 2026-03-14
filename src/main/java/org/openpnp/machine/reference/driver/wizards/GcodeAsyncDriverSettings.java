@@ -35,6 +35,7 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
     private JTextField interpolationJerkSteps;
     private JCheckBox reportedLocationConfirmation;
     private JCheckBox interpolationPerSegmentFeedRate;
+    private JTextField interpolationMaxStepVelocity;
 
     public GcodeAsyncDriverSettings(GcodeAsyncDriver driver) {
         this.driver = driver;
@@ -134,13 +135,13 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
         interpolationPanel.add(junctionDeviation, "4, 10, fill, default");
         junctionDeviation.setColumns(10);
 
-        JLabel lblPerSegmentFeedRate = new JLabel("Per-Segment Feed Rate?");
+        JLabel lblPerSegmentFeedRate = new JLabel("Per-Step Feed Rate?");
         lblPerSegmentFeedRate.setToolTipText("<html>"
-                + "Emit the actual average velocity as F on every interpolation segment,<br/>"
-                + "instead of the global peak velocity on the first segment only.<br/><br/>"
+                + "Emit the actual average velocity as F on every interpolation step,<br/>"
+                + "instead of the global peak velocity on the first step only.<br/><br/>"
                 + "When enabled, M204 acceleration commands are also suppressed, since<br/>"
-                + "the per-segment F value fully defines the stepping rate.<br/><br/>"
-                + "Enable this for controllers that buffer segments (e.g. via M920) and<br/>"
+                + "the per-step F value fully defines the stepping rate.<br/><br/>"
+                + "Enable this for controllers that buffer steps (e.g. via M920) and<br/>"
                 + "step at a constant rate per segment, using encoder feedback for<br/>"
                 + "position detection rather than acceleration-based motion control."
                 + "</html>");
@@ -148,6 +149,21 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
 
         interpolationPerSegmentFeedRate = new JCheckBox("");
         interpolationPanel.add(interpolationPerSegmentFeedRate, "4, 12");
+
+        JLabel lblMaxStepVelocity = new JLabel("Maximum Step Velocity Change [/s]");
+        lblMaxStepVelocity.setToolTipText("<html>"
+                + "Maximum allowed velocity change within a single interpolation step,<br/>"
+                + "in machine units per second (e.g. mm/s).<br/><br/>"
+                + "When set, forces additional step boundaries during constant-acceleration<br/>"
+                + "phases to keep velocity jumps between consecutive steps within stepper<br/>"
+                + "motor capabilities. Only effective when Per-Step Feed Rate is enabled.<br/><br/>"
+                + "Leave blank to disable. Start with 50 and tune as needed."
+                + "</html>");
+        interpolationPanel.add(lblMaxStepVelocity, "2, 14, right, default");
+
+        interpolationMaxStepVelocity = new JTextField();
+        interpolationPanel.add(interpolationMaxStepVelocity, "4, 14, fill, default");
+        interpolationMaxStepVelocity.setColumns(10);
 
         JLabel lblConfirmationFlowControl = new JLabel(Translations.getString("GcodeAsyncDriverSettings.SettingsPanel.ConfirmationFlowControlLabel.text")); //$NON-NLS-1$
         lblConfirmationFlowControl.setToolTipText(Translations.getString("GcodeAsyncDriverSettings.SettingsPanel.ConfirmationFlowControlLabel.toolTipText")); //$NON-NLS-1$
@@ -194,11 +210,14 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
         addWrappedBinding(driver, "interpolationMinStep", interpolationMinStep, "text", intConverter);
         addWrappedBinding(driver, "junctionDeviation", junctionDeviation, "text", lengthConverter);
         addWrappedBinding(driver, "interpolationPerSegmentFeedRate", interpolationPerSegmentFeedRate, "selected");
+        DoubleConverter doubleConverter = new DoubleConverter("%.1f");
+        addWrappedBinding(driver, "interpolationMaxStepVelocity", interpolationMaxStepVelocity, "text", doubleConverter);
 
         ComponentDecorators.decorateWithAutoSelect(interpolationMaxSteps);
         ComponentDecorators.decorateWithAutoSelect(interpolationJerkSteps);
         ComponentDecorators.decorateWithAutoSelect(interpolationTimeStep);
         ComponentDecorators.decorateWithAutoSelect(interpolationMinStep);
         ComponentDecorators.decorateWithAutoSelect(junctionDeviation);
+        ComponentDecorators.decorateWithAutoSelect(interpolationMaxStepVelocity);
     }
 }

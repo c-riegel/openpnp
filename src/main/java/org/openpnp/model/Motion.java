@@ -1159,7 +1159,7 @@ public class Motion {
                                 }
                             }
                             if (!newSegment) {
-                                // Check acceleration / simulate jerk control. 
+                                // Check acceleration / simulate jerk control.
                                 AxesLocation deltaA20 = acceleration2.subtract(acceleration0);
                                 for (ControllerAxis axis : segment.getControllerAxes()) {
                                     double da20 = Math.abs(deltaA20.getCoordinate(axis));
@@ -1169,6 +1169,16 @@ public class Motion {
                                         interpolationNeeded = true;
                                         break;
                                     }
+                                }
+                            }
+                            if (!newSegment && driver.getInterpolationPerSegmentFeedRate()) {
+                                // Check velocity change within accumulated step for constant-rate
+                                // stepping controllers. Limits the velocity jump between consecutive
+                                // steps to what the stepper motor can physically track.
+                                Double maxStepVelocity = driver.getInterpolationMaxStepVelocity();
+                                if (maxStepVelocity != null && Math.abs(v2 - v0) > maxStepVelocity) {
+                                    newSegment = true;
+                                    interpolationNeeded = true;
                                 }
                             }
                         }

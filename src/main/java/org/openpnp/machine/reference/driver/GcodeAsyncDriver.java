@@ -116,6 +116,9 @@ public class GcodeAsyncDriver extends GcodeDriver {
     @Attribute(required = false)
     private boolean interpolationPerSegmentFeedRate = false;
 
+    @Attribute(required = false)
+    private Double interpolationMaxStepVelocity = null;
+
     @Override
     public void home(Machine machine) throws Exception {
         super.home(machine);
@@ -214,6 +217,17 @@ public class GcodeAsyncDriver extends GcodeDriver {
         Object oldValue = this.interpolationPerSegmentFeedRate;
         this.interpolationPerSegmentFeedRate = interpolationPerSegmentFeedRate;
         firePropertyChange("interpolationPerSegmentFeedRate", oldValue, interpolationPerSegmentFeedRate);
+    }
+
+    @Override
+    public Double getInterpolationMaxStepVelocity() {
+        return interpolationMaxStepVelocity;
+    }
+
+    public void setInterpolationMaxStepVelocity(Double interpolationMaxStepVelocity) {
+        Object oldValue = this.interpolationMaxStepVelocity;
+        this.interpolationMaxStepVelocity = interpolationMaxStepVelocity;
+        firePropertyChange("interpolationMaxStepVelocity", oldValue, interpolationMaxStepVelocity);
     }
 
     @Override
