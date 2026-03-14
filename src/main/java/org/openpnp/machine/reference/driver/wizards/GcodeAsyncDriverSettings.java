@@ -34,6 +34,8 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
     private JTextField junctionDeviation;
     private JTextField interpolationJerkSteps;
     private JCheckBox reportedLocationConfirmation;
+    private JCheckBox useCrc16;
+    private JTextField crc16MaxRetries;
     private JCheckBox interpolationPerSegmentFeedRate;
     private JTextField interpolationMaxStepVelocity;
 
@@ -55,6 +57,10 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
                 FormSpecs.RELATED_GAP_COLSPEC,
                 FormSpecs.DEFAULT_COLSPEC,},
             new RowSpec[] {
+                FormSpecs.RELATED_GAP_ROWSPEC,
+                FormSpecs.DEFAULT_ROWSPEC,
+                FormSpecs.RELATED_GAP_ROWSPEC,
+                FormSpecs.DEFAULT_ROWSPEC,
                 FormSpecs.RELATED_GAP_ROWSPEC,
                 FormSpecs.DEFAULT_ROWSPEC,
                 FormSpecs.RELATED_GAP_ROWSPEC,
@@ -193,6 +199,32 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
         });
         settingsPanel.add(reportedLocationConfirmation, "4, 4");
 
+        JLabel lblUseCrc16 = new JLabel("Use CRC16?");
+        lblUseCrc16.setToolTipText("<html>"
+                + "Append CRC16 checksum to every command sent to the controller.<br/>"
+                + "The controller verifies the checksum and responds with 'rs' (resend)<br/>"
+                + "if corruption is detected. Requires Confirmation Flow Control to be enabled."
+                + "</html>");
+        settingsPanel.add(lblUseCrc16, "2, 6, right, default");
+
+        useCrc16 = new JCheckBox("");
+        useCrc16.addItemListener(new ItemListener() {
+            public void itemStateChanged(ItemEvent e) {
+                if (useCrc16.isSelected()) {
+                    confirmationFlowControl.setSelected(true);
+                }
+            }
+        });
+        settingsPanel.add(useCrc16, "4, 6");
+
+        JLabel lblCrc16MaxRetries = new JLabel("CRC16 Max Retries");
+        lblCrc16MaxRetries.setToolTipText("Maximum number of resend attempts when CRC16 verification fails.");
+        settingsPanel.add(lblCrc16MaxRetries, "6, 6, right, default");
+
+        crc16MaxRetries = new JTextField();
+        settingsPanel.add(crc16MaxRetries, "8, 6, fill, default");
+        crc16MaxRetries.setColumns(5);
+
     }
 
     @Override
@@ -204,6 +236,9 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
 
         addWrappedBinding(driver, "confirmationFlowControl", confirmationFlowControl, "selected");
         addWrappedBinding(driver, "reportedLocationConfirmation", reportedLocationConfirmation, "selected");
+        addWrappedBinding(driver, "useCrc16", useCrc16, "selected");
+        addWrappedBinding(driver, "crc16MaxRetries", crc16MaxRetries, "text", intConverter);
+        ComponentDecorators.decorateWithAutoSelect(crc16MaxRetries);
         addWrappedBinding(driver, "interpolationMaxSteps", interpolationMaxSteps, "text", intConverter);
         addWrappedBinding(driver, "interpolationJerkSteps", interpolationJerkSteps, "text", intConverter);
         addWrappedBinding(driver, "interpolationTimeStep", interpolationTimeStep, "text", doubleConverterFine);

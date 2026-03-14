@@ -99,6 +99,12 @@ public class GcodeAsyncDriver extends GcodeDriver {
     private boolean reportedLocationConfirmation = true;
 
     @Attribute(required = false)
+    private boolean useCrc16 = false;
+
+    @Attribute(required = false)
+    private int crc16MaxRetries = 3;
+
+    @Attribute(required = false)
     private int interpolationMaxSteps = 32;
 
     @Attribute(required = false)
@@ -142,6 +148,7 @@ public class GcodeAsyncDriver extends GcodeDriver {
 
     private boolean waitedForCommands;
     private volatile boolean confirmationComplete;
+    private volatile boolean resendRequested;
 
     public boolean isConfirmationFlowControl() {
         return confirmationFlowControl;
@@ -163,7 +170,27 @@ public class GcodeAsyncDriver extends GcodeDriver {
         firePropertyChange("reportedLocationConfirmation", oldValue, reportedLocationConfirmation);
     }
 
-    @Override 
+    public boolean isUseCrc16() {
+        return useCrc16;
+    }
+
+    public void setUseCrc16(boolean useCrc16) {
+        Object oldValue = this.useCrc16;
+        this.useCrc16 = useCrc16;
+        firePropertyChange("useCrc16", oldValue, useCrc16);
+    }
+
+    public int getCrc16MaxRetries() {
+        return crc16MaxRetries;
+    }
+
+    public void setCrc16MaxRetries(int crc16MaxRetries) {
+        Object oldValue = this.crc16MaxRetries;
+        this.crc16MaxRetries = crc16MaxRetries;
+        firePropertyChange("crc16MaxRetries", oldValue, crc16MaxRetries);
+    }
+
+    @Override
     public Integer getInterpolationMaxSteps() {
         return interpolationMaxSteps;
     }
@@ -287,6 +314,25 @@ public class GcodeAsyncDriver extends GcodeDriver {
                             lastCommand = null;
                         }
                     }
+                    // Handle CRC16 resend: if firmware responded with 'rs', resend the same command.
+                    if (resendRequested && useCrc16) {
+                        resendRequested = false;
+                        for (int retry = 0; retry < crc16MaxRetries; retry++) {
+                            Logger.warn("[{}] CRC16 resend {}/{}: {}", connectionName, retry + 1, crc16MaxRetries, command);
+                            receivedConfirmationsQueue.clear();
+                            comms.writeLine(command.line);
+                            Logger.trace("[{}] >> {} (resend)", connectionName, command);
+                            waitForConfirmation(command.toString(), command.getTimeout());
+                            if (!resendRequested) {
+                                break;
+                            }
+                            resendRequested = false;
+                        }
+                        if (resendRequested) {
+                            resendRequested = false;
+                            errorResponse = new Line("CRC16 verification failed after " + crc16MaxRetries + " retries");
+                        }
+                    }
                     if (command.line != null) {
                         // Set up the wanted confirmations for next time.
                         lastCommand = command;
@@ -318,6 +364,17 @@ public class GcodeAsyncDriver extends GcodeDriver {
     }
 
     @Override
+    protected void processResponse(Line line) {
+        if (useCrc16 && line.getLine().startsWith("rs")) {
+            resendRequested = true;
+            // Treat as confirmation so waitForConfirmation unblocks
+            receivedConfirmationsQueue.add(line);
+            return;
+        }
+        super.processResponse(line);
+    }
+
+    @Override
     protected void bailOnError() throws Exception {
         super.bailOnError();
         if (writerThread == null || ! writerThread.isAlive()) {
@@ -346,6 +403,9 @@ public class GcodeAsyncDriver extends GcodeDriver {
         if (command.isEmpty()) {
             Logger.debug("{} empty command after pre process", getCommunications().getConnectionName());
             return;
+        }
+        if (useCrc16) {
+            command = appendCrc16(command);
         }
         if (command.startsWith("$")) {
             waitForEmptyCommandQueue();

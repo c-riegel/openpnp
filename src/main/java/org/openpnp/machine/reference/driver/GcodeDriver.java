@@ -1502,6 +1502,29 @@ public class GcodeDriver extends AbstractReferenceDriver implements Named {
         return 0;
     }
 
+    /**
+     * CRC16 (CRC-CCITT variant) matching the firmware implementation.
+     */
+    protected static int crc16(byte[] data) {
+        int crc = 0xFFFF;
+        for (byte b : data) {
+            crc = ((crc >> 8) & 0xFF) | ((crc << 8) & 0xFFFF);
+            crc ^= (b & 0xFF);
+            crc ^= ((crc & 0xFF) >> 4);
+            crc ^= ((crc << 8) << 4) & 0xFFFF;
+            crc ^= (((crc & 0xFF) << 4) << 1) & 0xFFFF;
+        }
+        return crc & 0xFFFF;
+    }
+
+    /**
+     * Append *XXXX CRC16 suffix to a command string.
+     */
+    protected String appendCrc16(String command) {
+        int crc = crc16(command.getBytes());
+        return command + "*" + String.format("%04X", crc);
+    }
+
     protected class ReaderThread extends Thread {
         @Override
         public void run() {
