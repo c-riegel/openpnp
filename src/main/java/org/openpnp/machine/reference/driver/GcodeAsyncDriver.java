@@ -322,6 +322,37 @@ public class GcodeAsyncDriver extends GcodeDriver {
                         receivedConfirmationsQueue.clear();
                         comms.writeLine(command.line);
                         Logger.trace("[{}] >> {}", connectionName, command);
+
+                        // CRC16: wait for ok/rs. On rs, resend the exact same
+                        // command and wait again. Do not advance to next command.
+                        if (useCrc16) {
+                            for (int attempt = 0; attempt <= crc16MaxRetries; attempt++) {
+                                resendRequested = false;
+                                Line confirmation = receivedConfirmationsQueue.poll(
+                                        command.getTimeout(), TimeUnit.MILLISECONDS);
+                                if (confirmation == null) {
+                                    // Timeout — no ok or rs received
+                                    errorResponse = new Line("CRC16 timeout waiting for confirmation of: " + command);
+                                    break;
+                                }
+                                if (!resendRequested) {
+                                    // Got ok — command accepted
+                                    break;
+                                }
+                                // Got rs — resend exact same bytes
+                                if (attempt < crc16MaxRetries) {
+                                    Logger.warn("[{}] CRC16 resend {}/{}: {}", connectionName,
+                                            attempt + 1, crc16MaxRetries, command);
+                                    receivedConfirmationsQueue.clear();
+                                    comms.writeLine(command.line);
+                                    Logger.trace("[{}] >> {} (resend)", connectionName, command);
+                                } else {
+                                    errorResponse = new Line("CRC16 failed after " + crc16MaxRetries + " retries: " + command);
+                                }
+                            }
+                            // CRC acts as flow control — don't let confirmationFlowControl also wait
+                            lastCommand = null;
+                        }
                     }
                     else {
                         confirmationComplete = true;
