@@ -38,6 +38,7 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
     private JTextField crc16MaxRetries;
     private JCheckBox interpolationPerSegmentFeedRate;
     private JTextField interpolationMaxStepVelocity;
+    private JTextField interpolationMinEncoderDistance;
 
     public GcodeAsyncDriverSettings(GcodeAsyncDriver driver) {
         this.driver = driver;
@@ -171,6 +172,19 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
         interpolationPanel.add(interpolationMaxStepVelocity, "4, 14, fill, default");
         interpolationMaxStepVelocity.setColumns(10);
 
+        JLabel lblMinEncoderDistance = new JLabel("Minimum Encoder Distance [mm]");
+        lblMinEncoderDistance.setToolTipText("<html>"
+                + "Minimum total X/Y distance (in mm) for encoder-controlled S-curve segments.<br/>"
+                + "Moves below this threshold use the legacy planner instead of M920 buffering.<br/>"
+                + "This prevents tiny runout corrections during nozzle rotation from being<br/>"
+                + "driven at excessive stepping rates. Leave blank to always use M920."
+                + "</html>");
+        interpolationPanel.add(lblMinEncoderDistance, "2, 16, right, default");
+
+        interpolationMinEncoderDistance = new JTextField();
+        interpolationPanel.add(interpolationMinEncoderDistance, "4, 16, fill, default");
+        interpolationMinEncoderDistance.setColumns(10);
+
         JLabel lblConfirmationFlowControl = new JLabel(Translations.getString("GcodeAsyncDriverSettings.SettingsPanel.ConfirmationFlowControlLabel.text")); //$NON-NLS-1$
         lblConfirmationFlowControl.setToolTipText(Translations.getString("GcodeAsyncDriverSettings.SettingsPanel.ConfirmationFlowControlLabel.toolTipText")); //$NON-NLS-1$
         settingsPanel.add(lblConfirmationFlowControl, "2, 2, right, default");
@@ -203,7 +217,8 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
         lblUseCrc16.setToolTipText("<html>"
                 + "Append CRC16 checksum to every command sent to the controller.<br/>"
                 + "The controller verifies the checksum and responds with 'rs' (resend)<br/>"
-                + "if corruption is detected. Requires Confirmation Flow Control to be enabled."
+                + "if corruption is detected. When Confirmation Flow Control is also enabled,<br/>"
+                + "corrupted commands are automatically resent up to Max Retries times."
                 + "</html>");
         settingsPanel.add(lblUseCrc16, "2, 6, right, default");
 
@@ -240,6 +255,7 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
         addWrappedBinding(driver, "interpolationPerSegmentFeedRate", interpolationPerSegmentFeedRate, "selected");
         DoubleConverter doubleConverter = new DoubleConverter("%.1f");
         addWrappedBinding(driver, "interpolationMaxStepVelocity", interpolationMaxStepVelocity, "text", doubleConverter);
+        addWrappedBinding(driver, "interpolationMinEncoderDistance", interpolationMinEncoderDistance, "text", doubleConverter);
 
         ComponentDecorators.decorateWithAutoSelect(interpolationMaxSteps);
         ComponentDecorators.decorateWithAutoSelect(interpolationJerkSteps);
@@ -247,5 +263,6 @@ public class GcodeAsyncDriverSettings extends AbstractConfigurationWizard {
         ComponentDecorators.decorateWithAutoSelect(interpolationMinStep);
         ComponentDecorators.decorateWithAutoSelect(junctionDeviation);
         ComponentDecorators.decorateWithAutoSelect(interpolationMaxStepVelocity);
+        ComponentDecorators.decorateWithAutoSelect(interpolationMinEncoderDistance);
     }
 }

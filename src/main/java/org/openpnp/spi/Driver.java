@@ -336,6 +336,17 @@ import org.openpnp.spi.MotionPlanner.CompletionType;
     }
 
     /**
+     * @return The minimum X/Y distance (in mm) for encoder-controlled S-curve segments.
+     * Moves with total X/Y distance below this threshold use the legacy planner instead
+     * of M920 segment buffering. This prevents tiny runout corrections during nozzle
+     * rotation from being driven at excessive stepping rates. Default null = always use
+     * M920 when interpolated.
+     */
+    public default Double getInterpolationMinEncoderDistance() {
+        return null;
+    }
+
+    /**
      * @return The minimum velocity, acceleration, jerk the driver supports.
      * Used to prevent "rounded to zero" errors in decimal formatting and interpolation.
      *  

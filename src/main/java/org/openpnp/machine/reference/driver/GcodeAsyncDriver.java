@@ -125,6 +125,9 @@ public class GcodeAsyncDriver extends GcodeDriver {
     @Attribute(required = false)
     private Double interpolationMaxStepVelocity = null;
 
+    @Attribute(required = false)
+    private Double interpolationMinEncoderDistance = null;
+
     @Override
     public void home(Machine machine) throws Exception {
         super.home(machine);
@@ -258,6 +261,17 @@ public class GcodeAsyncDriver extends GcodeDriver {
     }
 
     @Override
+    public Double getInterpolationMinEncoderDistance() {
+        return interpolationMinEncoderDistance;
+    }
+
+    public void setInterpolationMinEncoderDistance(Double interpolationMinEncoderDistance) {
+        Object oldValue = this.interpolationMinEncoderDistance;
+        this.interpolationMinEncoderDistance = interpolationMinEncoderDistance;
+        firePropertyChange("interpolationMinEncoderDistance", oldValue, interpolationMinEncoderDistance);
+    }
+
+    @Override
     protected void connectThreads() throws Exception {
         super.connectThreads();
         commandQueue = new LinkedBlockingQueue<>(maxCommandsQueued);
@@ -308,11 +322,28 @@ public class GcodeAsyncDriver extends GcodeDriver {
                 try {
                     if (confirmationFlowControl && lastCommand != null) {
                         try {
-                            // Before we can send the new command, make sure the wanted confirmation count of the last command was received.
-                            waitForConfirmation(lastCommand.toString(), lastCommand.getTimeout());
+                            // Wait for the previous command's ok. If CRC16 is enabled
+                            // and firmware responds 'rs', resend the same command.
+                            for (int attempt = 0; ; attempt++) {
+                                resendRequested = false;
+                                waitForConfirmation(lastCommand.toString(), lastCommand.getTimeout());
+                                if (!resendRequested || !useCrc16) {
+                                    break; // got ok — proceed
+                                }
+                                if (attempt < crc16MaxRetries) {
+                                    Logger.warn("[{}] CRC16 resend {}/{}: {}",
+                                            connectionName, attempt + 1, crc16MaxRetries, lastCommand);
+                                    receivedConfirmationsQueue.clear();
+                                    comms.writeLine(lastCommand.line);
+                                    Logger.trace("[{}] >> {} (resend)", connectionName, lastCommand);
+                                } else {
+                                    errorResponse = new Line("CRC16 failed after "
+                                            + crc16MaxRetries + " retries: " + lastCommand);
+                                    break;
+                                }
+                            }
                         }
                         finally {
-                            // Whatever happens, never wait for this one again.
                             lastCommand = null;
                         }
                     }
@@ -322,37 +353,6 @@ public class GcodeAsyncDriver extends GcodeDriver {
                         receivedConfirmationsQueue.clear();
                         comms.writeLine(command.line);
                         Logger.trace("[{}] >> {}", connectionName, command);
-
-                        // CRC16: wait for ok/rs. On rs, resend the exact same
-                        // command and wait again. Do not advance to next command.
-                        if (useCrc16) {
-                            for (int attempt = 0; attempt <= crc16MaxRetries; attempt++) {
-                                resendRequested = false;
-                                Line confirmation = receivedConfirmationsQueue.poll(
-                                        command.getTimeout(), TimeUnit.MILLISECONDS);
-                                if (confirmation == null) {
-                                    // Timeout — no ok or rs received
-                                    errorResponse = new Line("CRC16 timeout waiting for confirmation of: " + command);
-                                    break;
-                                }
-                                if (!resendRequested) {
-                                    // Got ok — command accepted
-                                    break;
-                                }
-                                // Got rs — resend exact same bytes
-                                if (attempt < crc16MaxRetries) {
-                                    Logger.warn("[{}] CRC16 resend {}/{}: {}", connectionName,
-                                            attempt + 1, crc16MaxRetries, command);
-                                    receivedConfirmationsQueue.clear();
-                                    comms.writeLine(command.line);
-                                    Logger.trace("[{}] >> {} (resend)", connectionName, command);
-                                } else {
-                                    errorResponse = new Line("CRC16 failed after " + crc16MaxRetries + " retries: " + command);
-                                }
-                            }
-                            // CRC acts as flow control — don't let confirmationFlowControl also wait
-                            lastCommand = null;
-                        }
                     }
                     else {
                         confirmationComplete = true;

@@ -719,8 +719,24 @@ public abstract class AbstractMotionPlanner extends AbstractModelObject implemen
             // If the interpolator produced multiple segments, tell the firmware to buffer them
             // before executing. Firmware that does not support M920 will ignore it, and the
             // segments will execute normally as individual G0 commands.
+            // Only send M920 if the total X/Y distance exceeds the minimum encoder distance
+            // threshold. Short moves (e.g. runout corrections during nozzle rotation) use the
+            // legacy planner which respects per-axis speed limits.
             if (moveToCommands.size() > 1 && driver instanceof GcodeDriver) {
-                ((GcodeDriver) driver).sendGcode("M920 S" + moveToCommands.size());
+                boolean useEncoder = true;
+                Double minDist = driver.getInterpolationMinEncoderDistance();
+                if (minDist != null) {
+                    AxesLocation xySegment = plannedMotion.getLocation0()
+                            .motionSegmentTo(plannedMotion.getLocation1())
+                            .byType(Axis.Type.X, Axis.Type.Y);
+                    double xyDistance = xySegment.getEuclideanMetric();
+                    if (xyDistance < minDist) {
+                        useEncoder = false;
+                    }
+                }
+                if (useEncoder) {
+                    ((GcodeDriver) driver).sendGcode("M920 S" + moveToCommands.size());
+                }
             }
             for (Motion.MoveToCommand moveToCommand : moveToCommands) {
                 driver.moveTo(hm, moveToCommand);
