@@ -150,6 +150,8 @@ public class GcodeAsyncDriver extends GcodeDriver {
     protected LinkedBlockingQueue<CommandLine> commandQueue;
 
     private boolean waitedForCommands;
+    private int crc16SeqNum = -1;
+    private java.util.concurrent.ConcurrentHashMap<Integer, String> crc16SentCommands = new java.util.concurrent.ConcurrentHashMap<>();
     private volatile boolean confirmationComplete;
     private volatile boolean resendRequested;
 
@@ -380,9 +382,28 @@ public class GcodeAsyncDriver extends GcodeDriver {
     @Override
     protected void processResponse(Line line) {
         if (useCrc16 && line.getLine().startsWith("rs")) {
-            resendRequested = true;
-            receivedConfirmationsQueue.add(line);
-            Logger.trace("[CRC16] rs detected, resend requested");
+            // Extract sequence number from "rs N<seq>" and resend
+            String rsLine = line.getLine().trim();
+            int seq = -1;
+            if (rsLine.length() > 3 && rsLine.charAt(3) == 'N') {
+                try {
+                    seq = Integer.parseInt(rsLine.substring(4).trim());
+                } catch (NumberFormatException e) {
+                    // no sequence number
+                }
+            }
+            if (seq >= 0 && crc16SentCommands.containsKey(seq)) {
+                String original = crc16SentCommands.get(seq);
+                String resend = appendCrc16(original);
+                Logger.warn("[CRC16] resend N{}: {}", seq, resend);
+                try {
+                    getCommunications().writeLine(resend);
+                } catch (IOException e) {
+                    Logger.error(e, "[CRC16] resend failed");
+                }
+            } else {
+                Logger.warn("[CRC16] rs received but no sequence to resend: {}", rsLine);
+            }
             return;
         }
         super.processResponse(line);
@@ -423,6 +444,13 @@ public class GcodeAsyncDriver extends GcodeDriver {
             return;
         }
         if (useCrc16) {
+            int seq = ++crc16SeqNum;
+            command = "N" + seq + " " + command;
+            crc16SentCommands.put(seq, command);
+            // Keep buffer bounded — remove old entries
+            if (crc16SentCommands.size() > 100) {
+                crc16SentCommands.keySet().removeIf(k -> k < seq - 50);
+            }
             command = appendCrc16(command);
         }
         if (command.startsWith("$")) {

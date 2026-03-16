@@ -31,6 +31,7 @@ import java.util.function.BiFunction;
 
 import org.openpnp.machine.reference.axis.ReferenceControllerAxis;
 import org.openpnp.model.MotionProfile.ProfileOption;
+import org.openpnp.spi.Axis;
 import org.openpnp.spi.ControllerAxis;
 import org.openpnp.spi.Driver;
 import org.openpnp.spi.Driver.MotionControlType;
@@ -1171,10 +1172,12 @@ public class Motion {
                                     }
                                 }
                             }
-                            if (!newSegment && driver.getInterpolationPerSegmentFeedRate()) {
+                            if (driver.getInterpolationPerSegmentFeedRate()) {
                                 // Check velocity change within accumulated step for constant-rate
                                 // stepping controllers. Limits the velocity jump between consecutive
                                 // steps to what the stepper motor can physically track.
+                                // Runs regardless of other segment checks — velocity limits are
+                                // a hard constraint that overrides jerk control boundaries.
                                 Double maxStepVelocity = driver.getInterpolationMaxStepVelocity();
                                 if (maxStepVelocity != null && Math.abs(v2 - v0) > maxStepVelocity) {
                                     newSegment = true;
