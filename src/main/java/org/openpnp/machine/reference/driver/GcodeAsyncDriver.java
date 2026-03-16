@@ -381,9 +381,19 @@ public class GcodeAsyncDriver extends GcodeDriver {
 
     @Override
     protected void processResponse(Line line) {
-        if (useCrc16 && line.getLine().startsWith("rs")) {
-            // Extract sequence number from "rs N<seq>" and resend
-            String rsLine = line.getLine().trim();
+        // Check for rs anywhere in the line — serial corruption can merge
+        // rs with other output (e.g. "ok CPM:...rs N0")
+        String rsMatch = null;
+        if (useCrc16) {
+            int rsIdx = line.getLine().indexOf("rs N");
+            if (rsIdx >= 0) {
+                rsMatch = line.getLine().substring(rsIdx).trim();
+            } else if (line.getLine().startsWith("rs")) {
+                rsMatch = line.getLine().trim();
+            }
+        }
+        if (rsMatch != null) {
+            String rsLine = rsMatch;
             int seq = -1;
             if (rsLine.length() > 3 && rsLine.charAt(3) == 'N') {
                 try {
@@ -396,10 +406,15 @@ public class GcodeAsyncDriver extends GcodeDriver {
                 String original = crc16SentCommands.get(seq);
                 String resend = appendCrc16(original);
                 Logger.warn("[CRC16] resend N{}: {}", seq, resend);
+                // Queue at front of command queue — WriterThread sends it next.
+                // Do NOT write directly from ReaderThread (concurrent writes corrupt serial).
                 try {
-                    getCommunications().writeLine(resend);
-                } catch (IOException e) {
-                    Logger.error(e, "[CRC16] resend failed");
+                    CommandLine resendCmd = new CommandLine(resend, timeoutMilliseconds);
+                    // offer at head — LinkedBlockingQueue doesn't have addFirst,
+                    // so we use a flag to tell WriterThread to send this first.
+                    commandQueue.offer(resendCmd, 1, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Logger.error(e, "[CRC16] resend queue failed");
                 }
             } else {
                 Logger.warn("[CRC16] rs received but no sequence to resend: {}", rsLine);

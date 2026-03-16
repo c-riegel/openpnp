@@ -1023,7 +1023,9 @@ public class Motion {
         double dt = time/numSteps;
         boolean interpolationNeeded = false;
         int probeCount = 0;
+        int dvBisectCount = 0;
         for (int i = 1; i <= numSteps; i++) {
+            dvBisectCount = 0;
             double t2 = i*dt;
             boolean special = (i == numSteps);
             // Snap to a any special interval.
@@ -1076,8 +1078,9 @@ public class Motion {
                     final AxesLocation ds = segment;
                     double distance = ds.getRS274NGCMetric(driver, 
                             (axis) -> ds.getCoordinate(axis));
-                    AxesLocation movedAxesLocation = new AxesLocation(segment.getAxes(driver), 
-                            (axis) -> location2.getLengthCoordinate(axis));
+                    final AxesLocation loc2 = location2;
+                    AxesLocation movedAxesLocation = new AxesLocation(segment.getAxes(driver),
+                            (axis) -> loc2.getLengthCoordinate(axis));
                     AxesLocation velocity2 = getMomentaryVelocity(t2);
 
                     // Note, if the motion is curved, we might have an angle between the segments (corners of a polygon), 
@@ -1172,17 +1175,30 @@ public class Motion {
                                     }
                                 }
                             }
-                            if (driver.getInterpolationPerSegmentFeedRate()) {
-                                // Check velocity change within accumulated step for constant-rate
-                                // stepping controllers. Limits the velocity jump between consecutive
-                                // steps to what the stepper motor can physically track.
-                                // Runs regardless of other segment checks — velocity limits are
-                                // a hard constraint that overrides jerk control boundaries.
-                                Double maxStepVelocity = driver.getInterpolationMaxStepVelocity();
-                                if (maxStepVelocity != null && Math.abs(v2 - v0) > maxStepVelocity) {
-                                    newSegment = true;
-                                    interpolationNeeded = true;
+                        }
+                    }
+                    // Velocity change check runs AFTER all other checks — it's a hard
+                    // constraint that applies regardless of what triggered the segment.
+                    if (driver.getInterpolationPerSegmentFeedRate()) {
+                        Double maxStepVelocity = driver.getInterpolationMaxStepVelocity();
+                        if (maxStepVelocity != null) {
+                            double dv = Math.abs(v2 - v0);
+                            Logger.trace("interp: i={} v0={} v2={} dv={} max={} newSeg={} special={} dist={} segs={} bisect={}",
+                                i, String.format("%.1f", v0), String.format("%.1f", v2),
+                                String.format("%.1f", dv), String.format("%.1f", maxStepVelocity),
+                                newSegment, special, String.format("%.3f", distance), list.size(), dvBisectCount);
+                            if (dv > maxStepVelocity) {
+                                if (command1 == null && dvBisectCount < 20) {
+                                    // No previous candidate to commit — bisect the time interval
+                                    // to find a shorter segment where dv is within limits.
+                                    t2 = (t0 + t2) / 2;
+                                    location2 = getMomentaryLocation(t2);
+                                    acceleration2 = getMomentaryAcceleration(t2);
+                                    dvBisectCount++;
+                                    continue; // re-enter inner while loop with shorter segment
                                 }
+                                newSegment = true;
+                                interpolationNeeded = true;
                             }
                         }
                     }
@@ -1205,6 +1221,7 @@ public class Motion {
                         }
                         // Add to list.
                         list.add(command1);
+                        dvBisectCount = 0;
                         //                        if (commandS != null && !intervalsExtremes.contains(commandS.t0)) {
                         //                            if (commandS.feedRatePerSecond == null && command1.feedRatePerSecond == null
                         //                                && Math.abs(commandS.accelerationPerSecond2 - command1.accelerationPerSecond2) < MotionProfile.atol) {
